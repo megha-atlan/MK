@@ -665,7 +665,7 @@ Return ONLY a valid JSON array (no markdown, no explanation):
 
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01'},
+    headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})
   });
   const data=await res.json();
@@ -1049,7 +1049,7 @@ Exercise: ${ex.name} | ${ex.ph} | ${ex.tag} | Targets: ${(ex.dims||[]).join(', '
 Instructions: ${ex.text}${pa?`\nPrevious average: ${pa}/10`:''}
 Return ONLY valid JSON: {"transcript":"max 200 words","overall":7.2,"verdict":"exactly 8 words","clarity":7,"fluency":8,"expression":6,"precision":7,"strengths":["str1 max 12 words","str2"],"improvements":["imp1 max 15 words","imp2","imp3"],"coachNote":"2-3 sentences: most important gap + concrete drill."}`;
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01'},
+      headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:[{type:'text',text:'Analyse this recording.'},{type:'document',source:{type:'base64',media_type:mt,data:b64}}]}]})});
     const data=await res.json();if(!res.ok)throw new Error(data.error?.message||'API error');
     const raw=data.content.find(c=>c.type==='text')?.text||'';
