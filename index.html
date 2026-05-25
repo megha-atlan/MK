@@ -1018,15 +1018,24 @@ function renderRec(){
 }
 
 const animWF=()=>{const iv=setInterval(()=>{const w=document.getElementById('wf');if(!w){clearInterval(iv);return;}w.querySelectorAll('.wb').forEach(b=>b.style.height=Math.floor(2+Math.random()*32)+'px');},90);};
+let liveTranscript='';
 const startRec=async()=>{
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    cks=[];recS=0;
+    cks=[];recS=0;liveTranscript='';
     const mt=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
     mRec=new MediaRecorder(stream,{mimeType:mt});
     mRec.ondataavailable=e=>{if(e.data.size>0)cks.push(e.data);};
-    mRec.onstop=()=>{stream.getTracks().forEach(t=>t.stop());blob=new Blob(cks,{type:mRec.mimeType||'audio/webm'});burl=URL.createObjectURL(blob);recOn=false;clearInterval(recInt);renderRec();};
+    mRec.onstop=()=>{stream.getTracks().forEach(t=>t.stop());blob=new Blob(cks,{type:mRec.mimeType||'audio/webm'});burl=URL.createObjectURL(blob);recOn=false;clearInterval(recInt);if(recog)recog.stop();renderRec();};
     mRec.start(250);recOn=true;
+    // Start speech recognition for transcript
+    let recog=null;
+    try{
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      if(SR){recog=new SR();recog.continuous=true;recog.interimResults=true;recog.lang='en-US';
+        recog.onresult=e=>{liveTranscript=Array.from(e.results).map(r=>r[0].transcript).join(' ');};
+        recog.start();}
+    }catch(e2){/* speech recognition not available */}
     recInt=setInterval(()=>{recS++;const el=document.getElementById('rt');if(el)el.textContent=ft(recS);if(recS>=120){stopRec();toast('Max 2 min reached');}},1000);
     renderRec();
   }catch(e){toast('Microphone access denied');}
@@ -1039,18 +1048,20 @@ async function analyseRec(){
   const fa=document.getElementById('fba');
   if(fa)fa.innerHTML=`<div class="fb-card"><div class="fb-loading"><div class="spin"></div>Transcribing and scoring your speech…</div></div>`;
   try{
-    const ab=await blob.arrayBuffer();const u8=new Uint8Array(ab);let b='';u8.forEach(x=>b+=String.fromCharCode(x));const b64=btoa(b);
     const ex=getEX(curGI);
     const prev=getH().filter(h=>h.ek===String(curGI)).slice(0,5).map(h=>h.overall||h.ov);
     const pa=prev.length?Math.round(prev.reduce((a,b)=>a+b,0)/prev.length*10)/10:null;
-    const mt=(blob.type||'audio/webm').split(';')[0];
-    const sys=`Expert speech coach. Score an advanced speaker — surface fine-grained gaps only.
+    const transcript=liveTranscript||'[Transcript not captured — score based on exercise type and provide general coaching]';
+    const sys=`You are an expert speech coach. The speaker just performed this exercise and their speech was transcribed.
 Exercise: ${ex.name} | ${ex.ph} | ${ex.tag} | Targets: ${(ex.dims||[]).join(', ')}
-Instructions: ${ex.text}${pa?`\nPrevious average: ${pa}/10`:''}
-Return ONLY valid JSON: {"transcript":"max 200 words","overall":7.2,"verdict":"exactly 8 words","clarity":7,"fluency":8,"expression":6,"precision":7,"strengths":["str1 max 12 words","str2"],"improvements":["imp1 max 15 words","imp2","imp3"],"coachNote":"2-3 sentences: most important gap + concrete drill."}`;
+Instructions given to speaker: ${ex.text}${pa?`\nPrevious average: ${pa}/10`:''}
+Speaker transcript: "${transcript}"
+Recording duration: ${recS} seconds
+Score their performance based on the transcript and exercise. Surface fine-grained gaps.
+Return ONLY valid JSON: {"transcript":"the transcript text","overall":7.2,"verdict":"exactly 8 words","clarity":7,"fluency":8,"expression":6,"precision":7,"strengths":["str1 max 12 words","str2"],"improvements":["imp1 max 15 words","imp2","imp3"],"coachNote":"2-3 sentences: most important gap + concrete drill."}`;
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:[{type:'text',text:'Analyse this recording.'},{type:'document',source:{type:'base64',media_type:mt,data:b64}}]}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:[{type:'text',text:'Score this speech performance and return JSON feedback.'}]}]})});
     const data=await res.json();if(!res.ok)throw new Error(data.error?.message||'API error');
     const raw=data.content.find(c=>c.type==='text')?.text||'';
     const f=JSON.parse(raw.replace(/```json|```/g,'').trim());
